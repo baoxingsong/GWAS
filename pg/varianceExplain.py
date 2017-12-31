@@ -485,7 +485,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=
             bin_counts = np.bincount(snp)
             if w_missing:
 
-                if imputation_type == 'simple':
+                if imputation_type == 'simple': # assign mean value to missing value
                     mean = (bin_counts[1] + 2 * bin_counts[2]) / (bin_counts[0] + bin_counts[1] + bin_counts[2])
                     snp[snp == 3] = round(mean)
                 if imputation_type == 'simple2':
@@ -509,7 +509,7 @@ import sys
 import os
 
 #read genotype data
-snp = parse_plink_tped_file("./snp", imputation_type='simple')
+snp = parse_plink_tped_file("./snp", imputation_type='simple') # simple means assign mean value to missing value
 indel = parse_plink_tped_file("./indel3", imputation_type='simple')
 orf = parse_plink_tped_file("./orfn", imputation_type='simple')
 
