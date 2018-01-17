@@ -56,7 +56,7 @@ class _SnpsData_(object):
         self.chromosome = chromosome
         self.alignment_positions = alignment_positions
         self.id = id
-        self.marker_types = marker_types  # Where do these markers come frome, what type are they?  Useful for later analysis.
+        self.marker_types = marker_types  # Where do these markers come from, what type are they?  Useful for later analysis.
         self.alphabet = None
         self.missingVal = None
         self.associated_positions = associated_positions
@@ -414,16 +414,87 @@ class LinearMixedModel:
         # Run the model....
 
         for snp in sig_snps: #
-            res = self.get_estimates(eig_L=eig_L, xs=np.matrix(snp).T, ngrids=ngrids, llim=llim, ulim=ulim,
+            new_x = np.array(snp)
+            new_x.shape = len(snp)
+            (beta, rss, rank, sigma) = linalg.lstsq(self.X, new_x)
+            if float(rss) >= lin_depend_thres:
+                res = self.get_estimates(eig_L=eig_L, xs=np.matrix(snp).T, ngrids=ngrids, llim=llim, ulim=ulim,
                                      esp=esp, return_pvalue=True, return_f_stat=True)
-            if res['p_val'] < includedSnpThreadshold: # if the variants could explain significantly proportion variance
-                self.add_factor(snp, lin_depend_thres=lin_depend_thres) # linearly dependence will be checked
-
+                if res['p_val'] < includedSnpThreadshold: # if the variants could explain significantly proportion variance
+                    self.add_factor(snp, lin_depend_thres=lin_depend_thres) # linearly dependence will be checked
+                
         res = self.get_estimates(eig_L=eig_L, xs=None, ngrids=ngrids, llim=llim, ulim=ulim,
                                  esp=esp, return_pvalue=False, return_f_stat=True)
 
-        explained_variance_proportion = (self.y_var-res['rss'])/(self.y_var)
+        explained_variance_proportion = (self.y_var-res['rss'])/(self.y_var) # here the mixed model was just used to estimate beta values, variance beding explained by population structure is not really removed
+        if len(sig_snps)<1:
+            return 0
         return explained_variance_proportion
+
+    def get_estimates_pca_fix_model(self, xs=None, return_pvalue=False):
+        if xs is not None:
+            X = np.hstack([self.X, xs])
+        else:
+            X = self.X
+
+        q = X.shape[1]  # number of fixed effects
+        n = self.n  # number of individuls
+        p = n - q
+        # print("X")
+        # print(X)
+        (beta_est, rss, rank, sigma) = linalg.lstsq(X, self.Y)
+        # print ("rss")
+        # print (rss)
+        x_beta = X * beta_est
+        residuals = self.Y - x_beta
+        rss = residuals.T * residuals
+        # print ("rss")
+        # print(rss)
+        res_dict = { 'beta': beta_est, 'rss': rss }
+        if return_pvalue:
+            (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
+            f_stat = (h0_rss / rss - 1) * p / xs.shape[1]
+            res_dict['var_perc'] = 1.0 - rss / h0_rss
+            res_dict['f_stat'] = float(f_stat)
+            p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
+            res_dict['p_val'] = float(p_val)
+        return res_dict  # , lls, dlls, sp.log(deltas)
+
+    def variance_explained_by_significant_loci_fix(self, sig_snps, K=None, n_pcas=7, eig_L=None, includedSnpThreadshold = 1e-4, lin_depend_thres=1e-4):
+
+        assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
+        if K is None:
+            K = self.random_effects[1][1]
+        if eig_L is None:
+            eig_L = self._get_eigen_L_(K)
+        for i in range(n_pcas):
+            self.add_factor(eig_L['vectors'][:, self.n-i-1], lin_depend_thres=lin_depend_thres)
+        # print ("eigen values ")
+        # print (eig_L['values'])
+        # print ("eigen vectors ")
+        # print (eig_L['vectors'][:,0])
+        # print (eig_L['vectors'][:,1])
+        # print (eig_L['vectors'][:,2])
+        res = self.get_estimates_pca_fix_model( xs=None, return_pvalue=False)
+        pca_rss = res['rss']
+
+        # Run the model....
+
+        for snp in sig_snps: #
+            new_x = np.array(snp)
+            new_x.shape = len(snp)
+            (beta, rss, rank, sigma) = linalg.lstsq(self.X, new_x)
+            if float(rss) > lin_depend_thres:
+                res = self.get_estimates_pca_fix_model( xs=np.matrix(snp).T, return_pvalue=True)
+                if res['p_val'] < includedSnpThreadshold: # if the variants could explain significantly proportion variance
+                    self.add_factor(snp, lin_depend_thres=lin_depend_thres) # linearly dependence will be 
+
+        res = self.get_estimates_pca_fix_model( xs=None, return_pvalue=False)
+
+        explained_variance_proportion = (pca_rss-res['rss'])/(self.y_var)
+        # print(self.y_var)
+        return explained_variance_proportion
+
 
 
 def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=False):
@@ -598,8 +669,8 @@ f = open("significant_snps",'w')
 for snp_id in sig_snp_dic:
     f.write(snp_id + "\t" + snp_id+"\n")
 f.close()
-os.system('plink -tfile snp --exclude significant_snps --recode transpose --out snp_significant')
-os.system('emmax-kin-intel64 -v -d 10 snp_significant')
+#os.system('plink -tfile snp --exclude significant_snps --recode transpose --out snp_significant')
+#os.system('emmax-kin-intel64 -v -d 10 snp_significant')
 k = np.loadtxt("snp_significant.aBN.kinf")
 k = np.mat(k)
 
@@ -637,34 +708,34 @@ lmm.add_random_effect(k)
 
 
 orig_stdout = sys.stdout
-f = open('mixmodel_emma.var_prec', 'w')
+f = open('model_fix.var_prec', 'w')
 sys.stdout = f
 
-var_perc = lmm.variance_explained_by_significant_loci( xsSnp, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsSnp, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("SNP: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsIndel, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsIndel, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("INDEL: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("ORF: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsSnpIndel, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsSnpIndel, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("SNPINDEL: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsSnpOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsSnpOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("SNPORF: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsIndelOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsIndelOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("INDELORF: ", var_perc)
 lmm.clear_factors()
 
-var_perc = lmm.variance_explained_by_significant_loci( xsSnpIndelOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
+var_perc = lmm.variance_explained_by_significant_loci_fix( xsSnpIndelOrf, K=k, includedSnpThreadshold=1e-4, lin_depend_thres=1e-4)
 print ("SNPINDELORF: ", var_perc)
 lmm.clear_factors()
 
