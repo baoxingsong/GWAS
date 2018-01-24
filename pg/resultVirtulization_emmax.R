@@ -40,7 +40,7 @@ if (ymax<8) ymax<-8
 nMrk <- as.numeric(nrow(genotype))
 sign <- 0.05/nMrk
 
-
+permutation_threshold = 6.85974791698633
 
 changetoM <- function ( position ){
 	position=position/1000000;
@@ -72,11 +72,15 @@ qqPlot <- function (pval, truncate = FALSE, ylim = NULL,
 
 manhattanPlot <- function(genotype, ymax, sign, addBT=TRUE){
 	nMrkT <- as.numeric(nrow(genotype))
-	signT <- 0.05/nMrkT
+    signT <- 0.05/nMrkT
+    y_hline = -log10(sign)
+    if (ymax < y_hline+0.2){
+            ymax = y_hline + 0.2
+    }
 	if( addBT ){
     	ggplot(data=genotype, aes(x=position, y=-log10(pvalue), group=chr, color=chr))+geom_point(data=genotype, aes(x=position, y=-log10(pvalue), group=chr, color=chr))+
     		guides(colour=FALSE)+facet_grid(~chr, scales="free_x", space="free_x")+scale_x_continuous(labels=changetoM) +
-	    	labs(x="", y="-log10(pvalue)", title="") + ylim(0, ymax)+ geom_hline(aes(yintercept=-log10(sign)), color="red")+geom_hline(aes(yintercept=6.86), color="black", linetype=2)+
+	    	labs(x="", y="-log10(pvalue)", title="") + ylim(0, ymax)+ geom_hline(aes(yintercept=-log10(sign)), color="red")+geom_hline(aes(yintercept=permutation_threshold), color="black", linetype=2)+
 	    	geom_hline(aes(yintercept=-log10(signT)), color="green", linetype=2)+
 	    	theme_bw() +theme_grey(base_size = 36) + theme(axis.line = element_blank(),
 	        panel.grid.major = element_blank(),
@@ -88,7 +92,7 @@ manhattanPlot <- function(genotype, ymax, sign, addBT=TRUE){
 	}else{
     	ggplot(data=genotype, aes(x=position, y=-log10(pvalue), group=chr, color=chr))+geom_point(data=genotype, aes(x=position, y=-log10(pvalue), group=chr, color=chr))+
     		guides(colour=FALSE)+facet_grid(~chr, scales="free_x", space="free_x")+scale_x_continuous(labels=changetoM) +
-	    	labs(x="", y="-log10(pvalue)", title="") + ylim(0, ymax)+ geom_hline(aes(yintercept=-log10(sign)), color="red")+geom_hline(aes(yintercept=6.86), color="black", linetype=2)+
+	    	labs(x="", y="-log10(pvalue)", title="") + ylim(0, ymax)+ geom_hline(aes(yintercept=-log10(sign)), color="red")+geom_hline(aes(yintercept=permutation_threshold), color="black", linetype=2)+
 	    	theme_bw() +theme_grey(base_size = 36) + theme(axis.line = element_blank(),
 	        panel.grid.major = element_blank(),
 	        panel.grid.minor = element_blank(),
@@ -121,7 +125,7 @@ qqp
 dev.off()
 
 load("../../../tair10")
-top2 <- snp[which( (-log10(snp$pvalue))>6.86 ),]
+top2 <- snp[which( (-log10(snp$pvalue))>permutation_threshold ),]
 
 sink(paste(prefix, "_summary.txt",sep=""))
 for (i in  1:nrow(top2) ) {
@@ -153,7 +157,7 @@ qqp
 dev.off()
 
 load("../../../tair10")
-top2 <- indel[which( (-log10(indel$pvalue))>6.86 ),]
+top2 <- indel[which( (-log10(indel$pvalue))>permutation_threshold ),]
 
 sink(paste(prefix, "_summary.txt",sep=""))
 for (i in  1:nrow(top2) ) {
@@ -186,7 +190,7 @@ qqp
 dev.off()
 
 load("../../../tair10")
-top2 <- orf[which( (-log10(orf$pvalue))>6.86 ),]
+top2 <- orf[which( (-log10(orf$pvalue))>permutation_threshold ),]
 
 sink(paste(prefix, "_summary.txt",sep=""))
 for (i in  1:nrow(top2) ) {
@@ -218,7 +222,7 @@ qqp
 dev.off()
 
 load("../../../tair10")
-top2 <- all[which( (-log10(all$pvalue))>6.86 ),]
+top2 <- all[which( (-log10(all$pvalue))>permutation_threshold ),]
 
 sink(paste(prefix, "_summary.txt",sep=""))
 for (i in  1:nrow(top2) ) {
