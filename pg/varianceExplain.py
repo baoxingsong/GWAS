@@ -422,14 +422,27 @@ class LinearMixedModel:
                                      esp=esp, return_pvalue=True, return_f_stat=True)
                 if res['p_val'] < includedSnpThreadshold: # if the variants could explain significantly proportion variance
                     self.add_factor(snp, lin_depend_thres=lin_depend_thres) # linearly dependence will be checked
-                
+
+
         res = self.get_estimates(eig_L=eig_L, xs=None, ngrids=ngrids, llim=llim, ulim=ulim,
                                  esp=esp, return_pvalue=False, return_f_stat=True)
 
+
+
         explained_variance_proportion = (self.y_var-res['rss'])/(self.y_var) # here the mixed model was just used to estimate beta values, variance beding explained by population structure is not really removed
         if len(sig_snps)<1:
-            return 0
-        return explained_variance_proportion
+            return 0, 0
+        X_t = res['H_sqrt_inv'] * self.X  # we don't have any covariants
+        Y_t = res['H_sqrt_inv'] * self.Y
+        (beta_est, mahalanobis_rss, rank, sigma) = linalg.lstsq(X_t, Y_t)
+        x_beta = self.X * beta_est
+        residuals = self.Y - x_beta
+        rss = residuals.T * residuals
+        h0_X = res['H_sqrt_inv'] * np.matrix(np.ones((self.n, 1), dtype='single'))
+        (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y_t)
+        var_perc = 1.0 - mahalanobis_rss / h0_rss
+        
+        return explained_variance_proportion, var_perc
 
     def get_estimates_pca_fix_model(self, xs=None, return_pvalue=False):
         if xs is not None:
