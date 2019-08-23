@@ -1,5 +1,5 @@
 # GWAS
-The scripts I used for GWASA analysis.
+The scripts I used for GWAS analysis.
 
 
 ## Citation:
