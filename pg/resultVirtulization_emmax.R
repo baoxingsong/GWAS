@@ -66,7 +66,7 @@ qqPlot <- function (pval, truncate = FALSE, ylim = NULL,
     ggplot()+geom_polygon(data=polyArea, aes(x=x, y=y), fill="gray")+geom_point(data=points, aes(x=expected, y=observed))+geom_abline(intercept = 0, slope=1, colour="red")+
     annotate("text", x = 1, y = ymax-0.5, label = paste("λ=", round(lambda, 3), sep=""), size=10)+labs(x="-log10(Expected P)", y="-log10(Observed P)", fill="", title="") +
     theme_grey(base_size = 36) + 
-    theme(axis.line = element_line(colour = "black"), panel.background = element_blank(),panel.border = element_rect(fill=NA,color="black", size=0.5, linetype="solid") )
+    theme(axis.line = element_blank(), panel.background = element_blank(),panel.border = element_rect(fill=NA,color="black", size=0.5, linetype="solid") )
 }
 
 
